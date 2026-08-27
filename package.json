@@ -1,0 +1,19 @@
+{
+  "name": "fincobra-woocommerce",
+  "version": "0.1.0",
+  "private": true,
+  "description": "FinCobra payment gateway for WooCommerce",
+  "license": "GPL-2.0-or-later",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "format": "node scripts/format.mjs",
+    "format:check": "node scripts/format.mjs --check",
+    "lint": "node scripts/lint.mjs",
+    "package": "node scripts/build.mjs",
+    "test": "node --test tests/js/*.test.mjs",
+    "test:php": "php tests/php/run.php"
+  },
+  "engines": {
+    "node": "24.15.0"
+  }
+}

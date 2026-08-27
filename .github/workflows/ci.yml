@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 24.15.0
+      - uses: shivammathur/setup-php@bf6b4fbd49ca58e4608c9c89fba0b8d90bd2a39f # 2.35.5
+        with:
+          php-version: '8.1'
+          extensions: sodium
+          coverage: none
+      - name: Test, lint, and package
+        run: |
+          npm test
+          npm run test:php
+          npm run lint
+          npm run format:check
+          npm run build
+      - name: Verify zip layout
+        run: |
+          python3 - <<'PY'
+          import zipfile
+          from pathlib import Path
+
+          archive = Path('dist/fincobra-woocommerce.zip')
+          if not archive.is_file():
+              raise SystemExit('missing dist/fincobra-woocommerce.zip')
+
+          names = zipfile.ZipFile(archive).namelist()
+          if not names:
+              raise SystemExit('zip is empty')
+          unexpected = [name for name in names if not name.startswith('fincobra-woocommerce/')]
+          if unexpected:
+              raise SystemExit(f'zip root must be fincobra-woocommerce/: {unexpected[:5]}')
+          required = 'fincobra-woocommerce/fincobra-woocommerce.php'
+          if required not in names:
+              raise SystemExit(f'missing {required}')
+          print('\n'.join(sorted(names)))
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: fincobra-woocommerce
+          path: dist/fincobra-woocommerce.zip
+          if-no-files-found: error
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          notes='Private pilot of FinCobra for WooCommerce.
+
+          Pricing: $99/yr (0% commission) or 0.5% PAYG.
+
+          Install the attached fincobra-woocommerce.zip in WordPress (Plugins → Add New → Upload Plugin). There is no auto-updater.
+
+          USD one-time product orders only. Connect with a FinCobra API key; the plugin registers a webhook for payment confirmation.
+
+          Docs: https://fincobra.com/docs/
+          Demo: https://woo-demo.fincobra.com/'
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            gh release upload "${GITHUB_REF_NAME}" dist/fincobra-woocommerce.zip --clobber
+          else
+            gh release create "${GITHUB_REF_NAME}" dist/fincobra-woocommerce.zip \
+              --title "${GITHUB_REF_NAME}" \
+              --notes "${notes}"
+          fi
