@@ -6,7 +6,7 @@ an authoritative invoice lookup.
 
 This plugin is distributed as a GitHub Releases zip. There is no auto-updater.
 
-- Docs: <https://fincobra.com/docs/>
+- Docs: <https://fincobra.com/docs/checkout/woocommerce.html>
 - Live demo shop: <https://woo-demo.fincobra.com/>
 
 ## What this release supports
@@ -32,7 +32,7 @@ Unpaid, voided, and expired invoices do not count as commission volume.
 ## Install
 
 1. Download `fincobra-woocommerce.zip` from
-   [GitHub Releases](https://github.com/dexstandard/fincobra-woocommerce/releases).
+   [GitHub Releases (latest)](https://github.com/dexstandard/fincobra-woocommerce/releases/latest).
 2. In WordPress, open **Plugins → Add New → Upload Plugin** and upload the zip.
 3. Activate **FinCobra for WooCommerce**. WooCommerce must already be active.
 4. Open **WooCommerce → Settings → Payments → FinCobra**.
