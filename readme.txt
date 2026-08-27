@@ -2,12 +2,12 @@
 Contributors: fincobra
 Tags: cryptocurrency, bitcoin, stablecoin, payments, checkout
 Requires at least: 6.6
-Tested up to: 7.0
+Tested up to: 7.1
 Requires PHP: 8.1
 Requires Plugins: woocommerce
 WC requires at least: 9.0
-WC tested up to: 10.9
-Stable tag: 0.1.1
+WC tested up to: 11.0
+Stable tag: 0.1.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -15,33 +15,27 @@ Accept supported cryptocurrencies through FinCobra's hosted, non-custodial check
 
 == Description ==
 
-FinCobra is a private-pilot WooCommerce payment method. Shoppers are redirected
-to a hosted FinCobra payment page. Payment confirmation is verified
-server-to-server before the WooCommerce order is marked paid.
-
-This release supports USD stores and standard one-time product orders. It does
-not support automatic refunds, subscriptions, or pre-orders.
+FinCobra adds a WooCommerce payment method that redirects shoppers to a hosted
+FinCobra payment page. Payment confirmation is verified server-to-server before
+the WooCommerce order is marked paid.
 
 The plugin sends order total, USD currency, a store-scoped order reference,
-return URLs, and order identifiers to FinCobra. It does not send cart contents,
-passwords, wallet private keys, or card data.
+return URLs, and order identifiers to the FinCobra service. It does not send
+cart contents, passwords, wallet private keys, or card data.
 
-Connect with a FinCobra Checkout API key. The plugin exchanges that key once
-for encrypted store-scoped credentials and registers a webhook for payment
-confirmation.
-
-Install the zip from GitHub Releases. There is no auto-updater.
+FinCobra is an external service operated at https://fincobra.com/. Its terms
+are at https://fincobra.com/terms and privacy policy is at
+https://fincobra.com/privacy.
 
 A FinCobra account and either a USD 99/year WooCommerce plan with no percentage
 commission or the standard no-subscription plan with a 0.5% commission are
 required.
 
+Version 1 supports USD stores and standard one-time product orders. It does not
+claim support for automatic refunds, subscriptions, or pre-orders.
+
 Docs: https://fincobra.com/docs/
 Demo: https://woo-demo.fincobra.com/
-
-FinCobra is an external service operated at https://fincobra.com/. Its terms
-are at https://fincobra.com/terms and privacy policy is at
-https://fincobra.com/privacy.
 
 == External service ==
 
@@ -61,14 +55,14 @@ Privacy policy: https://fincobra.com/privacy
 
 == Installation ==
 
-1. Download fincobra-woocommerce.zip from this GitHub repository's Releases page.
-2. In WordPress, open Plugins > Add New > Upload Plugin and upload the zip.
-3. Activate FinCobra for WooCommerce. WooCommerce must already be active.
-4. Open WooCommerce > Settings > Payments > FinCobra.
-5. Enter a FinCobra Checkout API key and save.
-6. The key is exchanged once for encrypted, store-scoped credentials and a
-   webhook secret. The raw API key is not saved.
-7. Enable the payment method and save.
+1. Activate WooCommerce first.
+2. Upload and activate FinCobra for WooCommerce. There is no WordPress.org listing or auto-updater.
+3. Open WooCommerce > Settings > Payments > FinCobra, or
+   wp-admin/admin.php?page=wc-settings&tab=checkout&section=fincobra
+   if the Payments table does not load.
+4. Paste a FinCobra merchant API key and click Connect.
+5. Choose Annual or Commission at https://fincobra.com/woocommerce if prompted.
+6. Enable FinCobra at checkout and save.
 
 == Frequently Asked Questions ==
 
@@ -84,7 +78,7 @@ an order paid. A scheduled reconciliation also recovers missed webhooks.
 
 = Which currencies are supported? =
 
-This release accepts WooCommerce orders denominated in USD only.
+Version 1 accepts WooCommerce orders denominated in USD only.
 
 = Are credentials logged? =
 
@@ -92,6 +86,12 @@ No. Optional WooCommerce diagnostic logs contain only redacted identifiers and
 status information.
 
 == Changelog ==
+
+= 0.1.2 =
+
+* Check for a WooCommerce billing plan after connect and warn on the settings screen.
+* Add a Connect action, Connected badge, and FinCobra checkout defaults for new installs.
+* Add a Payments-tab fallback link when the WooCommerce payments table does not load.
 
 = 0.1.1 =
 

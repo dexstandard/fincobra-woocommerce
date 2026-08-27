@@ -31,18 +31,25 @@ Unpaid, voided, and expired invoices do not count as commission volume.
 
 ## Install
 
-1. Download `fincobra-woocommerce.zip` from
+1. Activate WooCommerce first.
+2. Download `fincobra-woocommerce.zip` from
    [GitHub Releases (latest)](https://github.com/dexstandard/fincobra-woocommerce/releases/latest).
-2. In WordPress, open **Plugins → Add New → Upload Plugin** and upload the zip.
-3. Activate **FinCobra for WooCommerce**. WooCommerce must already be active.
-4. Open **WooCommerce → Settings → Payments → FinCobra**.
-5. Paste a FinCobra Checkout API key and save. The key is exchanged once for
-   encrypted, store-scoped credentials and a webhook secret. The raw API key is
-   not stored.
-6. Enable the payment method and save.
+   There is no WordPress.org listing or auto-updater.
+3. In WordPress, open **Plugins → Add New → Upload Plugin** and upload the zip.
+4. Activate **FinCobra for WooCommerce**.
+5. Open **WooCommerce → Settings → Payments → FinCobra**, or
+   `wp-admin/admin.php?page=wc-settings&tab=checkout&section=fincobra`
+   if the Payments table does not load.
+6. Paste a FinCobra merchant API key and click **Connect**. The key is
+   exchanged once for encrypted, store-scoped credentials and a webhook secret.
+   The raw API key is not stored.
+7. Choose Annual or Commission at
+   <https://fincobra.com/woocommerce> if the settings screen asks you to.
+8. Enable FinCobra at checkout and save.
 
 Requirements: WordPress 6.6+, WooCommerce 9.0+, PHP 8.1+, a USD store, HTTPS,
-and a FinCobra account with a receiving wallet.
+and a FinCobra account with a receiving wallet. Current WooCommerce 11
+requires WordPress 6.9 or later.
 
 ## How payment works
 

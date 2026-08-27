@@ -83,6 +83,15 @@ function rest_url( string $path ): string {
 	return 'https://woo-demo.fincobra.com/wp-json/' . $path;
 }
 
+function admin_url( string $path ): string {
+	return 'https://woo-demo.fincobra.com/wp-admin/' . ltrim( $path, '/' );
+}
+
+function get_option( string $key, mixed $default = false ): mixed {
+	unset( $key );
+	return $default;
+}
+
 function get_bloginfo( string $field ): string {
 	unset( $field );
 	return 'FinCobra Store';
@@ -288,6 +297,42 @@ assert_same(
 );
 assert_same( 'POST', $GLOBALS['fincobra_http_request']['args']['method'], 'installation rotation uses POST' );
 assert_false( isset( $GLOBALS['fincobra_http_request']['args']['body'] ), 'installation rotation sends no request body' );
+
+$GLOBALS['fincobra_http_response'] = array(
+	'status' => 200,
+	'body'   => '{"entitled":false,"planSelected":false,"blockingReason":"Select a WooCommerce billing plan."}',
+);
+$billing_status = $api_client->get_billing_status( 'fc_woo_test' );
+assert_same(
+	'https://fincobra.com/api/checkout/woocommerce/billing',
+	$GLOBALS['fincobra_http_request']['url'],
+	'billing status uses the scoped billing endpoint'
+);
+assert_same( 'GET', $GLOBALS['fincobra_http_request']['args']['method'], 'billing status uses GET' );
+assert_same(
+	'fc_woo_test',
+	$GLOBALS['fincobra_http_request']['args']['headers']['X-WooCommerce-Key'],
+	'billing status authenticates with the scoped store key'
+);
+assert_true(
+	FinCobra_Api_Client::billing_status_missing_plan( $billing_status ),
+	'a missing Woo billing plan is detected from the billing payload'
+);
+assert_false(
+	FinCobra_Api_Client::billing_status_missing_plan(
+		array(
+			'entitled'        => true,
+			'planSelected'    => true,
+			'blockingReason'  => null,
+		)
+	),
+	'a selected Woo billing plan is not treated as missing'
+);
+assert_same(
+	'https://woo-demo.fincobra.com/wp-admin/admin.php?page=wc-settings&tab=checkout&section=fincobra',
+	FinCobra_Gateway::gateway_settings_url(),
+	'Payments fallback uses the classic FinCobra settings deep link'
+);
 
 $GLOBALS['fincobra_http_response'] = array(
 	'status' => 403,

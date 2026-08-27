@@ -9,9 +9,11 @@ defined( 'ABSPATH' ) || exit;
 
 final class FinCobra_Api_Client {
 	public const BILLING_PLAN_URL = 'https://fincobra.com/woocommerce';
+	public const API_KEYS_URL     = 'https://fincobra.com/checkout/settings';
 
 	private const INSTALLATIONS_PATH = '/api/checkout/woocommerce/installations';
 	private const INVOICES_PATH      = '/api/checkout/woocommerce/invoices';
+	private const BILLING_PATH       = '/api/checkout/woocommerce/billing';
 	private const MISSING_BILLING_PLAN_MARKER = 'Select a WooCommerce billing plan';
 
 	private string $base_url;
@@ -122,6 +124,27 @@ final class FinCobra_Api_Client {
 	 */
 	public function create_invoice( array $invoice, string $scoped_key ) {
 		return $this->request( 'POST', self::INVOICES_PATH, $invoice, $this->scoped_headers( $scoped_key ) );
+	}
+
+	/**
+	 * @param string $scoped_key Store-scoped credential.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public function get_billing_status( string $scoped_key ) {
+		return $this->request( 'GET', self::BILLING_PATH, null, $this->scoped_headers( $scoped_key ) );
+	}
+
+	/**
+	 * @param array<string, mixed> $status Billing status payload.
+	 */
+	public static function billing_status_missing_plan( array $status ): bool {
+		if ( array_key_exists( 'planSelected', $status ) ) {
+			return true !== $status['planSelected'];
+		}
+		$reason = isset( $status['blockingReason'] ) && is_string( $status['blockingReason'] )
+			? $status['blockingReason']
+			: '';
+		return self::is_missing_billing_plan_error( $reason );
 	}
 
 	public static function is_missing_billing_plan_error( string $message ): bool {

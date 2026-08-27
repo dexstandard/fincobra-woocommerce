@@ -4,7 +4,7 @@
 	const settings = window.wc.wcSettings.getSetting( 'fincobra_data', {} );
 	const decode = window.wp.htmlEntities.decodeEntities;
 	const createElement = window.wp.element.createElement;
-	const label = decode( settings.title || 'Pay with crypto' );
+	const label = decode( settings.title || 'FinCobra' );
 
 	const Content = function () {
 		return createElement(
@@ -12,7 +12,7 @@
 			null,
 			decode(
 				settings.description ||
-					'Pay securely with supported cryptocurrencies.',
+					'Continue to FinCobra to pay on a hosted checkout page.',
 			),
 		);
 	};

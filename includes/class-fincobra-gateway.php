@@ -24,8 +24,8 @@ final class FinCobra_Gateway extends WC_Payment_Gateway {
 		$this->init_form_fields();
 		$this->init_settings();
 
-		$this->title              = sanitize_text_field( $this->get_option( 'title', __( 'Pay with crypto', 'fincobra-woocommerce' ) ) );
-		$this->description        = sanitize_textarea_field( $this->get_option( 'description', __( 'Pay securely with supported cryptocurrencies.', 'fincobra-woocommerce' ) ) );
+		$this->title              = sanitize_text_field( $this->get_option( 'title', __( 'FinCobra', 'fincobra-woocommerce' ) ) );
+		$this->description        = sanitize_textarea_field( $this->get_option( 'description', __( 'Continue to FinCobra to pay on a hosted checkout page.', 'fincobra-woocommerce' ) ) );
 		$this->enabled            = $this->get_option( 'enabled', 'no' );
 		$this->fincobra_logger    = new FinCobra_Logger( 'yes' === $this->get_option( 'debug', 'no' ) );
 		$this->api                = new FinCobra_Api_Client( $this->api_url(), $this->fincobra_logger );
@@ -33,32 +33,47 @@ final class FinCobra_Gateway extends WC_Payment_Gateway {
 		add_action( 'woocommerce_update_options_payment_gateways_' . $this->id, array( $this, 'process_admin_options' ) );
 		add_action( 'admin_notices', array( $this, 'currency_notice' ) );
 		add_action( 'admin_notices', array( $this, 'billing_plan_notice' ) );
+		add_action( 'admin_notices', array( $this, 'payments_tab_fallback_notice' ) );
 	}
 
 	public function init_form_fields(): void {
-		$this->form_fields = array(
-			'enabled'     => array(
-				'title'   => __( 'Enable FinCobra', 'fincobra-woocommerce' ),
-				'type'    => 'checkbox',
-				'label'   => __( 'Show FinCobra at checkout', 'fincobra-woocommerce' ),
-				'default' => 'no',
+		$connected = $this->stored_connection_is_present();
+		$connection = array(
+			'connection' => array(
+				'title' => $connected
+					? __( 'Connection', 'fincobra-woocommerce' )
+					: __( 'Merchant API key', 'fincobra-woocommerce' ),
+				'type'  => 'fincobra_connection',
 			),
+		);
+		$enabled = array(
+			'enabled' => array(
+				'title'       => __( 'Enable FinCobra', 'fincobra-woocommerce' ),
+				'type'        => 'checkbox',
+				'label'       => __( 'Show FinCobra at checkout', 'fincobra-woocommerce' ),
+				'default'     => 'no',
+				'description' => $connected
+					? __( 'Turn this on after the store is connected.', 'fincobra-woocommerce' )
+					: '',
+			),
+		);
+		$rest = array(
 			'title'       => array(
 				'title'       => __( 'Checkout title', 'fincobra-woocommerce' ),
 				'type'        => 'text',
-				'default'     => __( 'Pay with crypto', 'fincobra-woocommerce' ),
+				'default'     => __( 'FinCobra', 'fincobra-woocommerce' ),
 				'desc_tip'    => true,
 				'description' => __( 'The payment method name shoppers see.', 'fincobra-woocommerce' ),
 			),
 			'description' => array(
-				'title'       => __( 'Checkout description', 'fincobra-woocommerce' ),
-				'type'        => 'textarea',
-				'default'     => __( 'Pay securely with supported cryptocurrencies.', 'fincobra-woocommerce' ),
-				'description' => __( 'No wallet details are entered in your store.', 'fincobra-woocommerce' ),
-			),
-			'connection'  => array(
-				'title' => __( 'FinCobra connection', 'fincobra-woocommerce' ),
-				'type'  => 'fincobra_connection',
+				'title'             => __( 'Checkout description', 'fincobra-woocommerce' ),
+				'type'              => 'textarea',
+				'default'           => __( 'Continue to FinCobra to pay on a hosted checkout page.', 'fincobra-woocommerce' ),
+				'description'       => __( 'Shoppers leave your store to finish payment on FinCobra.', 'fincobra-woocommerce' ),
+				'css'               => 'min-height: 4em; height: 4.5em;',
+				'custom_attributes' => array(
+					'rows' => 3,
+				),
 			),
 			'api_url'     => array(
 				'title'       => __( 'API URL', 'fincobra-woocommerce' ),
@@ -74,6 +89,9 @@ final class FinCobra_Gateway extends WC_Payment_Gateway {
 				'description' => __( 'Credentials, signatures, customer data, and request bodies are never logged.', 'fincobra-woocommerce' ),
 			),
 		);
+		$this->form_fields = $connected
+			? array_merge( $enabled, $connection, $rest )
+			: array_merge( $connection, $enabled, $rest );
 	}
 
 	public function is_available(): bool {
@@ -83,9 +101,26 @@ final class FinCobra_Gateway extends WC_Payment_Gateway {
 	}
 
 	public function is_connected(): bool {
-		return '' !== $this->installation_id()
-			&& null !== $this->scoped_key()
-			&& null !== $this->webhook_secret();
+		return $this->stored_connection_is_present();
+	}
+
+	private function stored_connection_is_present(): bool {
+		$settings = get_option( $this->get_option_key(), array() );
+		if ( ! is_array( $settings ) ) {
+			return false;
+		}
+		$installation_id = isset( $settings['installation_id'] ) && is_string( $settings['installation_id'] )
+			? sanitize_text_field( $settings['installation_id'] )
+			: '';
+		$key = isset( $settings['scoped_key_ciphertext'] ) && is_string( $settings['scoped_key_ciphertext'] )
+			? $settings['scoped_key_ciphertext']
+			: '';
+		$secret = isset( $settings['webhook_secret_ciphertext'] ) && is_string( $settings['webhook_secret_ciphertext'] )
+			? $settings['webhook_secret_ciphertext']
+			: '';
+		return '' !== $installation_id
+			&& null !== FinCobra_Credential_Store::decrypt( $key )
+			&& null !== FinCobra_Credential_Store::decrypt( $secret );
 	}
 
 	/**
@@ -184,25 +219,51 @@ final class FinCobra_Gateway extends WC_Payment_Gateway {
 	 * @param array<string, mixed> $data Field data.
 	 */
 	public function generate_fincobra_connection_html( string $key, array $data ): string {
-		unset( $key, $data );
+		$title     = isset( $data['title'] ) && is_string( $data['title'] ) ? $data['title'] : __( 'Merchant API key', 'fincobra-woocommerce' );
 		$connected = $this->is_connected();
+		unset( $key );
 		ob_start();
 		?>
 		<tr valign="top">
-			<th scope="row" class="titledesc"><?php esc_html_e( 'FinCobra connection', 'fincobra-woocommerce' ); ?></th>
+			<th scope="row" class="titledesc">
+				<label for="fincobra_merchant_api_key"><?php echo esc_html( $title ); ?></label>
+			</th>
 			<td class="forminp">
+				<style>
+					.fincobra-connection-card{max-width:36rem;padding:12px 14px;border:1px solid #c3c4c7;border-radius:4px;background:#fff}
+					.fincobra-status-badge{display:inline-block;padding:2px 8px;border-radius:999px;background:#d1fae5;color:#047857;font-weight:600;font-size:12px;line-height:1.6}
+					.fincobra-connect-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+					.fincobra-connect-row .regular-input{max-width:25rem}
+				</style>
 				<?php if ( $connected ) : ?>
-					<p><strong><?php esc_html_e( 'Connected', 'fincobra-woocommerce' ); ?></strong></p>
-					<p class="description"><?php esc_html_e( 'This store uses a scoped credential. Your merchant API key was not saved.', 'fincobra-woocommerce' ); ?></p>
-					<div class="notice notice-warning inline">
-						<p><?php echo wp_kses( FinCobra_Api_Client::missing_billing_plan_notice_html(), self::notice_allowed_html() ); ?></p>
+					<div class="fincobra-connection-card">
+						<p><span class="fincobra-status-badge"><?php esc_html_e( 'Connected', 'fincobra-woocommerce' ); ?></span></p>
+						<p class="description"><?php esc_html_e( 'This store uses a scoped credential. Your merchant API key was not saved.', 'fincobra-woocommerce' ); ?></p>
+						<?php if ( $this->billing_plan_is_missing() ) : ?>
+							<div class="notice notice-warning inline">
+								<p><?php echo wp_kses( FinCobra_Api_Client::missing_billing_plan_notice_html(), self::notice_allowed_html() ); ?></p>
+							</div>
+						<?php endif; ?>
+						<label><input type="checkbox" name="fincobra_disconnect" value="1"> <?php esc_html_e( 'Disconnect this store when changes are saved', 'fincobra-woocommerce' ); ?></label>
 					</div>
-					<label><input type="checkbox" name="fincobra_disconnect" value="1"> <?php esc_html_e( 'Disconnect this store when changes are saved', 'fincobra-woocommerce' ); ?></label>
 				<?php else : ?>
-					<label for="fincobra_merchant_api_key"><strong><?php esc_html_e( 'Merchant API key', 'fincobra-woocommerce' ); ?></strong></label>
-					<input id="fincobra_merchant_api_key" name="fincobra_merchant_api_key" type="password" autocomplete="new-password" class="input-text regular-input">
-					<p class="description"><?php esc_html_e( 'Paste the key and click Save changes to connect.', 'fincobra-woocommerce' ); ?></p>
-					<p class="description"><?php esc_html_e( 'Used once to connect this store, then discarded. Create a key in your FinCobra account.', 'fincobra-woocommerce' ); ?></p>
+					<div class="fincobra-connect-row">
+						<input id="fincobra_merchant_api_key" name="fincobra_merchant_api_key" type="password" autocomplete="new-password" class="input-text regular-input">
+						<button type="submit" class="button-primary" name="save" value="<?php echo esc_attr( __( 'Connect', 'fincobra-woocommerce' ) ); ?>"><?php esc_html_e( 'Connect', 'fincobra-woocommerce' ); ?></button>
+					</div>
+					<p class="description">
+						<?php esc_html_e( 'Paste the key and click Connect.', 'fincobra-woocommerce' ); ?>
+						<?php
+						echo wp_kses(
+							sprintf(
+								/* translators: %s: FinCobra checkout settings URL. */
+								__( 'Create a key in the <a href="%s">FinCobra dashboard</a>.', 'fincobra-woocommerce' ),
+								esc_url( FinCobra_Api_Client::API_KEYS_URL )
+							),
+							self::notice_allowed_html()
+						);
+						?>
+					</p>
 				<?php endif; ?>
 			</td>
 		</tr>
@@ -246,7 +307,11 @@ final class FinCobra_Gateway extends WC_Payment_Gateway {
 			WC_Admin_Settings::add_error( $result->get_error_message() );
 			return false;
 		}
-		WC_Admin_Settings::add_message( __( 'FinCobra connected successfully.', 'fincobra-woocommerce' ) );
+		$this->refresh_billing_plan_status();
+		WC_Admin_Settings::add_message( __( 'FinCobra connected successfully. Enable FinCobra at checkout and save.', 'fincobra-woocommerce' ) );
+		if ( $this->billing_plan_is_missing() ) {
+			WC_Admin_Settings::add_error( FinCobra_Api_Client::missing_billing_plan_message() );
+		}
 		return true;
 	}
 
@@ -321,6 +386,7 @@ final class FinCobra_Gateway extends WC_Payment_Gateway {
 		$this->settings['scoped_key_ciphertext']    = $encrypted_key;
 		$this->settings['webhook_secret_ciphertext'] = $encrypted_secret;
 		update_option( $this->get_option_key(), $this->settings, false );
+		$this->refresh_billing_plan_status();
 		return true;
 	}
 
@@ -390,8 +456,39 @@ final class FinCobra_Gateway extends WC_Payment_Gateway {
 		if ( ! $this->is_connected() || ! $this->is_gateway_settings_screen() || ! current_user_can( 'manage_woocommerce' ) ) {
 			return;
 		}
+		$this->refresh_billing_plan_status();
+		if ( ! $this->billing_plan_is_missing() ) {
+			return;
+		}
 		echo '<div class="notice notice-warning"><p>';
 		echo wp_kses( FinCobra_Api_Client::missing_billing_plan_notice_html(), self::notice_allowed_html() );
+		echo '</p></div>';
+	}
+
+	public function payments_tab_fallback_notice(): void {
+		if ( ! $this->is_payments_list_screen() || ! current_user_can( 'manage_woocommerce' ) ) {
+			return;
+		}
+		$url = self::gateway_settings_url();
+		echo '<noscript><div class="notice notice-info"><p>';
+		echo wp_kses(
+			sprintf(
+				/* translators: %s: FinCobra WooCommerce settings URL. */
+				__( 'Open <a href="%s">FinCobra payment settings</a> if the Payments table does not load.', 'fincobra-woocommerce' ),
+				esc_url( $url )
+			),
+			self::notice_allowed_html()
+		);
+		echo '</p></div></noscript>';
+		echo '<div class="notice notice-info"><p>';
+		echo wp_kses(
+			sprintf(
+				/* translators: %s: FinCobra WooCommerce settings URL. */
+				__( 'FinCobra settings: <a href="%s">WooCommerce → Settings → Payments → FinCobra</a>.', 'fincobra-woocommerce' ),
+				esc_url( $url )
+			),
+			self::notice_allowed_html()
+		);
 		echo '</p></div>';
 	}
 
@@ -404,6 +501,36 @@ final class FinCobra_Gateway extends WC_Payment_Gateway {
 		$tab     = isset( $_GET['tab'] ) ? sanitize_text_field( wp_unslash( $_GET['tab'] ) ) : '';
 		$section = isset( $_GET['section'] ) ? sanitize_text_field( wp_unslash( $_GET['section'] ) ) : '';
 		return 'wc-settings' === $page && 'checkout' === $tab && $this->id === $section;
+	}
+
+	private function is_payments_list_screen(): bool {
+		$page    = isset( $_GET['page'] ) ? sanitize_text_field( wp_unslash( $_GET['page'] ) ) : '';
+		$tab     = isset( $_GET['tab'] ) ? sanitize_text_field( wp_unslash( $_GET['tab'] ) ) : '';
+		$section = isset( $_GET['section'] ) ? sanitize_text_field( wp_unslash( $_GET['section'] ) ) : '';
+		return 'wc-settings' === $page && 'checkout' === $tab && '' === $section;
+	}
+
+	public static function gateway_settings_url(): string {
+		return admin_url( 'admin.php?page=wc-settings&tab=checkout&section=fincobra' );
+	}
+
+	public function billing_plan_is_missing(): bool {
+		return 'no' === sanitize_text_field( $this->get_option( 'billing_plan_selected', '' ) );
+	}
+
+	public function refresh_billing_plan_status(): void {
+		$scoped_key = $this->scoped_key();
+		if ( null === $scoped_key ) {
+			return;
+		}
+		$status = $this->api->get_billing_status( $scoped_key );
+		if ( is_wp_error( $status ) ) {
+			return;
+		}
+		$this->settings['billing_plan_selected'] = FinCobra_Api_Client::billing_status_missing_plan( $status )
+			? 'no'
+			: 'yes';
+		update_option( $this->get_option_key(), $this->settings, false );
 	}
 
 	/**
@@ -448,7 +575,8 @@ final class FinCobra_Gateway extends WC_Payment_Gateway {
 		unset(
 			$this->settings['installation_id'],
 			$this->settings['scoped_key_ciphertext'],
-			$this->settings['webhook_secret_ciphertext']
+			$this->settings['webhook_secret_ciphertext'],
+			$this->settings['billing_plan_selected']
 		);
 		$this->settings['enabled'] = 'no';
 		update_option( $this->get_option_key(), $this->settings, false );

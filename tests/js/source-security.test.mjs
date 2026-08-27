@@ -94,12 +94,21 @@ test( 'missing Woo billing plan errors are rewritten and linked on the settings 
 	const client = await readFile( join( root, 'includes/class-fincobra-api-client.php' ), 'utf8' );
 	const gateway = await readFile( join( root, 'includes/class-fincobra-gateway.php' ), 'utf8' );
 	assert.match( client, /BILLING_PLAN_URL = 'https:\/\/fincobra\.com\/woocommerce'/ );
+	assert.match( client, /API_KEYS_URL     = 'https:\/\/fincobra\.com\/checkout\/settings'/ );
 	assert.match( client, /rewrite_error_message/ );
+	assert.match( client, /get_billing_status/ );
 	assert.match( client, /Choose Annual or Commission at %s, then try again/ );
 	assert.match( client, /fincobra_missing_billing_plan/ );
 	assert.match( gateway, /billing_plan_notice/ );
-	assert.match( gateway, /missing_billing_plan_notice_html/ );
-	assert.match( gateway, /Paste the key and click Save changes to connect/ );
+	assert.match( gateway, /refresh_billing_plan_status/ );
+	assert.match( gateway, /fincobra-status-badge/ );
+	assert.match( gateway, /esc_html_e\( 'Connect'/ );
+	assert.match( gateway, /Enable FinCobra at checkout and save/ );
+	assert.match( gateway, /payments_tab_fallback_notice/ );
+	assert.match( gateway, /section=fincobra/ );
+	assert.match( gateway, /Continue to FinCobra to pay on a hosted checkout page/ );
+	assert.doesNotMatch( gateway, /Pay with crypto/ );
+	assert.doesNotMatch( gateway, /Paste the key and click Save changes to connect/ );
 	assert.doesNotMatch( gateway, /wc_add_notice\(\s*esc_html\(\s*\$result->get_error_message\(\)/ );
 	assert.doesNotMatch( gateway, /Select a WooCommerce billing plan/ );
 } );
@@ -111,4 +120,12 @@ test( 'plugin advertises only product payments and cleans credentials on uninsta
 	assert.doesNotMatch( gateway, /subscriptions|refunds|pre-orders/ );
 	assert.match( uninstall, /delete_option\( 'woocommerce_fincobra_settings' \)/ );
 	assert.match( uninstall, /as_unschedule_all_actions/ );
+} );
+
+test( 'checkout block script registers only on enqueue hooks', async () => {
+	const blocks = await readFile( join( root, 'includes/class-fincobra-blocks-support.php' ), 'utf8' );
+	assert.match( blocks, /add_action\( 'wp_enqueue_scripts', array\( \$this, 'register_payment_method_script' \) \)/ );
+	assert.match( blocks, /add_action\( 'admin_enqueue_scripts', array\( \$this, 'register_payment_method_script' \) \)/ );
+	assert.match( blocks, /doing_action\( 'wp_enqueue_scripts' \)/ );
+	assert.match( blocks, /doing_action\( 'admin_enqueue_scripts' \)/ );
 } );
