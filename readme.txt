@@ -7,7 +7,7 @@ Requires PHP: 8.1
 Requires Plugins: woocommerce
 WC requires at least: 9.0
 WC tested up to: 10.9
-Stable tag: 0.1.0
+Stable tag: 0.1.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -92,6 +92,11 @@ No. Optional WooCommerce diagnostic logs contain only redacted identifiers and
 status information.
 
 == Changelog ==
+
+= 0.1.1 =
+
+* Show the WooCommerce billing page link on the settings screen after connect.
+* Replace the raw missing-plan invoice error with a merchant-facing message.
 
 = 0.1.0 =
 

@@ -8,8 +8,11 @@
 defined( 'ABSPATH' ) || exit;
 
 final class FinCobra_Api_Client {
+	public const BILLING_PLAN_URL = 'https://fincobra.com/woocommerce';
+
 	private const INSTALLATIONS_PATH = '/api/checkout/woocommerce/installations';
 	private const INVOICES_PATH      = '/api/checkout/woocommerce/invoices';
+	private const MISSING_BILLING_PLAN_MARKER = 'Select a WooCommerce billing plan';
 
 	private string $base_url;
 	private FinCobra_Logger $logger;
@@ -121,6 +124,49 @@ final class FinCobra_Api_Client {
 		return $this->request( 'POST', self::INVOICES_PATH, $invoice, $this->scoped_headers( $scoped_key ) );
 	}
 
+	public static function is_missing_billing_plan_error( string $message ): bool {
+		return false !== stripos( $message, self::MISSING_BILLING_PLAN_MARKER )
+			|| $message === self::missing_billing_plan_message();
+	}
+
+	public static function missing_billing_plan_message(): string {
+		return sprintf(
+			/* translators: %s: FinCobra WooCommerce billing URL. */
+			__( 'Choose Annual or Commission at %s, then try again.', 'fincobra-woocommerce' ),
+			self::BILLING_PLAN_URL
+		);
+	}
+
+	public static function missing_billing_plan_notice_html(): string {
+		$url = self::BILLING_PLAN_URL;
+		return sprintf(
+			/* translators: %s: FinCobra WooCommerce billing URL. */
+			__( 'Choose Annual or Commission at %s, then try again.', 'fincobra-woocommerce' ),
+			'<a href="' . esc_url( $url ) . '">' . esc_html( $url ) . '</a>'
+		);
+	}
+
+	/**
+	 * @param mixed $error Potential WordPress error.
+	 */
+	public static function format_error_notice( $error ): string {
+		if ( ! is_wp_error( $error ) ) {
+			return '';
+		}
+		$message = $error->get_error_message();
+		if ( 'fincobra_missing_billing_plan' === $error->get_error_code()
+			|| self::is_missing_billing_plan_error( $message ) ) {
+			return self::missing_billing_plan_notice_html();
+		}
+		return esc_html( $message );
+	}
+
+	public static function rewrite_error_message( string $message ): string {
+		return self::is_missing_billing_plan_error( $message )
+			? self::missing_billing_plan_message()
+			: $message;
+	}
+
 	/**
 	 * @param string $invoice_id Invoice identifier.
 	 * @param string $scoped_key Store-scoped credential.
@@ -179,6 +225,13 @@ final class FinCobra_Api_Client {
 			$message = is_array( $data ) && isset( $data['error'] ) && is_string( $data['error'] )
 				? sanitize_text_field( $data['error'] )
 				: __( 'FinCobra rejected the request. Please try again.', 'fincobra-woocommerce' );
+			if ( self::is_missing_billing_plan_error( $message ) ) {
+				return new \WP_Error(
+					'fincobra_missing_billing_plan',
+					self::missing_billing_plan_message(),
+					array( 'status' => $status )
+				);
+			}
 			return new \WP_Error( 'fincobra_api_error', $message, array( 'status' => $status ) );
 		}
 

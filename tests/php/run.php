@@ -18,6 +18,14 @@ final class WP_Error {
 	public function __construct( public string $code, public string $message, public array $data = array() ) {
 	}
 
+	public function get_error_code(): string {
+		return $this->code;
+	}
+
+	public function get_error_message(): string {
+		return $this->message;
+	}
+
 	/**
 	 * @return array<string, mixed>
 	 */
@@ -57,6 +65,14 @@ function esc_url_raw( string $value ): string {
 
 function sanitize_text_field( string $value ): string {
 	return trim( preg_replace( '/[\r\n\t]+/', ' ', $value ) ?? '' );
+}
+
+function esc_html( string $value ): string {
+	return htmlspecialchars( $value, ENT_QUOTES, 'UTF-8' );
+}
+
+function esc_url( string $value ): string {
+	return filter_var( $value, FILTER_VALIDATE_URL ) ? $value : '';
 }
 
 function home_url( string $path ): string {
@@ -272,6 +288,53 @@ assert_same(
 );
 assert_same( 'POST', $GLOBALS['fincobra_http_request']['args']['method'], 'installation rotation uses POST' );
 assert_false( isset( $GLOBALS['fincobra_http_request']['args']['body'] ), 'installation rotation sends no request body' );
+
+$GLOBALS['fincobra_http_response'] = array(
+	'status' => 403,
+	'body'   => '{"error":"Billing blocked invoice creation: Select a WooCommerce billing plan."}',
+);
+$billing_plan_error = $api_client->create_invoice( array( 'orderId' => '42' ), 'fc_woo_test' );
+assert_true( is_wp_error( $billing_plan_error ), 'a missing Woo billing plan is an invoice error' );
+assert_same(
+	'fincobra_missing_billing_plan',
+	$billing_plan_error->get_error_code(),
+	'a missing Woo billing plan uses a dedicated error code'
+);
+assert_same(
+	'Choose Annual or Commission at https://fincobra.com/woocommerce, then try again.',
+	FinCobra_Api_Client::rewrite_error_message( 'Billing blocked invoice creation: Select a WooCommerce billing plan.' ),
+	'the raw billing-plan API sentence is rewritten for merchants'
+);
+assert_same(
+	'Choose Annual or Commission at https://fincobra.com/woocommerce, then try again.',
+	$billing_plan_error->get_error_message(),
+	'invoice creation returns the merchant-facing billing-plan sentence'
+);
+assert_same(
+	'Choose Annual or Commission at <a href="https://fincobra.com/woocommerce">https://fincobra.com/woocommerce</a>, then try again.',
+	FinCobra_Api_Client::format_error_notice( $billing_plan_error ),
+	'checkout and settings notices link the WooCommerce billing page'
+);
+assert_true(
+	FinCobra_Api_Client::is_missing_billing_plan_error( 'Billing blocked invoice creation: Select a WooCommerce billing plan.' ),
+	'the exact API billing-plan sentence is detected'
+);
+assert_false(
+	FinCobra_Api_Client::is_missing_billing_plan_error( 'Billing blocked invoice creation: Past-due billing invoice must be paid first.' ),
+	'other billing blocks keep their original API sentence'
+);
+$GLOBALS['fincobra_http_response'] = array(
+	'status' => 403,
+	'body'   => '{"error":"Billing blocked invoice creation: Past-due billing invoice must be paid first."}',
+);
+$past_due_error = $api_client->create_invoice( array( 'orderId' => '42' ), 'fc_woo_test' );
+assert_true( is_wp_error( $past_due_error ), 'a past-due billing block is still an invoice error' );
+assert_same( 'fincobra_api_error', $past_due_error->get_error_code(), 'other billing blocks keep the generic API error code' );
+assert_same(
+	'Billing blocked invoice creation: Past-due billing invoice must be paid first.',
+	$past_due_error->get_error_message(),
+	'other billing blocks are not rewritten as a missing-plan notice'
+);
 
 $GLOBALS['fincobra_http_response'] = array(
 	'status' => 201,

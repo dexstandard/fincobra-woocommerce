@@ -90,6 +90,20 @@ test( 'webhooks verify raw bytes then fetch authoritative invoice state', async 
 	assert.match( source, /is_fresh\( \$event\['createdAt'\]/ );
 } );
 
+test( 'missing Woo billing plan errors are rewritten and linked on the settings screen', async () => {
+	const client = await readFile( join( root, 'includes/class-fincobra-api-client.php' ), 'utf8' );
+	const gateway = await readFile( join( root, 'includes/class-fincobra-gateway.php' ), 'utf8' );
+	assert.match( client, /BILLING_PLAN_URL = 'https:\/\/fincobra\.com\/woocommerce'/ );
+	assert.match( client, /rewrite_error_message/ );
+	assert.match( client, /Choose Annual or Commission at %s, then try again/ );
+	assert.match( client, /fincobra_missing_billing_plan/ );
+	assert.match( gateway, /billing_plan_notice/ );
+	assert.match( gateway, /missing_billing_plan_notice_html/ );
+	assert.match( gateway, /Paste the key and click Save changes to connect/ );
+	assert.doesNotMatch( gateway, /wc_add_notice\(\s*esc_html\(\s*\$result->get_error_message\(\)/ );
+	assert.doesNotMatch( gateway, /Select a WooCommerce billing plan/ );
+} );
+
 test( 'plugin advertises only product payments and cleans credentials on uninstall', async () => {
 	const gateway = await readFile( join( root, 'includes/class-fincobra-gateway.php' ), 'utf8' );
 	const uninstall = await readFile( join( root, 'uninstall.php' ), 'utf8' );

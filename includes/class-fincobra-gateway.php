@@ -32,6 +32,7 @@ final class FinCobra_Gateway extends WC_Payment_Gateway {
 
 		add_action( 'woocommerce_update_options_payment_gateways_' . $this->id, array( $this, 'process_admin_options' ) );
 		add_action( 'admin_notices', array( $this, 'currency_notice' ) );
+		add_action( 'admin_notices', array( $this, 'billing_plan_notice' ) );
 	}
 
 	public function init_form_fields(): void {
@@ -149,7 +150,7 @@ final class FinCobra_Gateway extends WC_Payment_Gateway {
 
 		if ( is_wp_error( $result ) ) {
 			$this->fincobra_logger->error( 'Invoice creation failed', array( 'order_id' => $order->get_id() ) );
-			wc_add_notice( esc_html( $result->get_error_message() ), 'error' );
+			wc_add_notice( FinCobra_Api_Client::format_error_notice( $result ), 'error' );
 			return array( 'result' => 'failure' );
 		}
 
@@ -193,10 +194,14 @@ final class FinCobra_Gateway extends WC_Payment_Gateway {
 				<?php if ( $connected ) : ?>
 					<p><strong><?php esc_html_e( 'Connected', 'fincobra-woocommerce' ); ?></strong></p>
 					<p class="description"><?php esc_html_e( 'This store uses a scoped credential. Your merchant API key was not saved.', 'fincobra-woocommerce' ); ?></p>
+					<div class="notice notice-warning inline">
+						<p><?php echo wp_kses( FinCobra_Api_Client::missing_billing_plan_notice_html(), self::notice_allowed_html() ); ?></p>
+					</div>
 					<label><input type="checkbox" name="fincobra_disconnect" value="1"> <?php esc_html_e( 'Disconnect this store when changes are saved', 'fincobra-woocommerce' ); ?></label>
 				<?php else : ?>
 					<label for="fincobra_merchant_api_key"><strong><?php esc_html_e( 'Merchant API key', 'fincobra-woocommerce' ); ?></strong></label>
 					<input id="fincobra_merchant_api_key" name="fincobra_merchant_api_key" type="password" autocomplete="new-password" class="input-text regular-input">
+					<p class="description"><?php esc_html_e( 'Paste the key and click Save changes to connect.', 'fincobra-woocommerce' ); ?></p>
 					<p class="description"><?php esc_html_e( 'Used once to connect this store, then discarded. Create a key in your FinCobra account.', 'fincobra-woocommerce' ); ?></p>
 				<?php endif; ?>
 			</td>
@@ -381,8 +386,35 @@ final class FinCobra_Gateway extends WC_Payment_Gateway {
 		echo '</p></div>';
 	}
 
+	public function billing_plan_notice(): void {
+		if ( ! $this->is_connected() || ! $this->is_gateway_settings_screen() || ! current_user_can( 'manage_woocommerce' ) ) {
+			return;
+		}
+		echo '<div class="notice notice-warning"><p>';
+		echo wp_kses( FinCobra_Api_Client::missing_billing_plan_notice_html(), self::notice_allowed_html() );
+		echo '</p></div>';
+	}
+
 	private function api_url(): string {
 		return esc_url_raw( $this->get_option( 'api_url', self::DEFAULT_API_URL ) );
+	}
+
+	private function is_gateway_settings_screen(): bool {
+		$page    = isset( $_GET['page'] ) ? sanitize_text_field( wp_unslash( $_GET['page'] ) ) : '';
+		$tab     = isset( $_GET['tab'] ) ? sanitize_text_field( wp_unslash( $_GET['tab'] ) ) : '';
+		$section = isset( $_GET['section'] ) ? sanitize_text_field( wp_unslash( $_GET['section'] ) ) : '';
+		return 'wc-settings' === $page && 'checkout' === $tab && $this->id === $section;
+	}
+
+	/**
+	 * @return array<string, array<string, bool>>
+	 */
+	private static function notice_allowed_html(): array {
+		return array(
+			'a' => array(
+				'href' => true,
+			),
+		);
 	}
 
 	private function merchant_reference( WC_Order $order ): string {

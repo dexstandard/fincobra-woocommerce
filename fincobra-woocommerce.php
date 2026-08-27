@@ -3,7 +3,7 @@
  * Plugin Name: FinCobra for WooCommerce
  * Plugin URI: https://fincobra.com/woocommerce
  * Description: Accept cryptocurrency through FinCobra's hosted checkout.
- * Version: 0.1.0
+ * Version: 0.1.1
  * Requires at least: 6.6
  * Requires PHP: 8.1
  * Requires Plugins: woocommerce
@@ -20,7 +20,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'FINCOBRA_WC_VERSION', '0.1.0' );
+define( 'FINCOBRA_WC_VERSION', '0.1.1' );
 define( 'FINCOBRA_WC_FILE', __FILE__ );
 define( 'FINCOBRA_WC_DIR', plugin_dir_path( __FILE__ ) );
 define( 'FINCOBRA_WC_URL', plugin_dir_url( __FILE__ ) );
